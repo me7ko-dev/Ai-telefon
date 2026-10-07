@@ -50,3 +50,13 @@ def test_manual_booking_and_cancel(panel):
 
 def test_first_message_says_ai(panel):
     assert "Аз съм AI асистент" in panel.get("/panel/prompt").text
+
+
+def test_first_message_preposition():
+    from types import SimpleNamespace
+
+    from app.services.prompt import build_first_message
+
+    assert "се със Салон" in build_first_message(SimpleNamespace(name="Салон „Демо“", assistant_name=""))
+    assert "се с Автосервиз" in build_first_message(SimpleNamespace(name="Автосервиз Иванов", assistant_name="Ани"))
+    assert "казвам се Ани" in build_first_message(SimpleNamespace(name="Автосервиз Иванов", assistant_name="Ани"))

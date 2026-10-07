@@ -1,3 +1,5 @@
+import pytest
+
 from conftest import TOOL_HEADERS
 
 THU = "2026-10-08"  # четвъртък, работен ден с почивка 13–14
@@ -178,3 +180,33 @@ def _business_form(**overrides):
     form |= {"from_6": "09:00", "to_6": "18:00"}
     form.update(overrides)
     return form
+
+
+# ---------- етап 2: номер на обаждащия се и лог ----------
+
+def test_cancel_with_caller_id(tool):
+    _book(tool)
+    r = tool("cancel_appointment", phone="0888123456", date=THU, caller_id="+359899999999")
+    assert not r["ok"] and r["error"] == "caller_mismatch"
+    r = tool("cancel_appointment", phone="0888123456", date=THU, caller_id="+359888123456")
+    assert r["ok"]
+
+
+@pytest.mark.parametrize("caller_id", ["", "{{system__caller_id}}", "anonymous"])
+def test_cancel_ignores_missing_caller_id(tool, caller_id):
+    _book(tool)
+    assert tool("cancel_appointment", phone="0888123456", date=THU, caller_id=caller_id)["ok"]
+
+
+def test_tool_calls_are_logged(panel, tool, client):
+    tool("check_availability", service="Сешоар", date=THU)
+    client.post("/api/b/demo/tools/book_appointment", json={"name": "Иван"}, headers=TOOL_HEADERS)
+    page = panel.get("/panel/tool-log").text
+    assert "check_availability" in page and "book_appointment" in page
+    assert "Липсват или са грешни полета" in page
+
+
+def test_wrong_secret_is_logged(panel, client):
+    client.post("/api/b/demo/tools/take_message", json={"name": "a"}, headers={"X-Tool-Secret": "greshen"})
+    page = panel.get("/panel/tool-log").text
+    assert "take_message" in page and "Невалиден ключ" in page

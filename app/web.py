@@ -1,5 +1,6 @@
 """Шаблони и помощни функции за панела."""
 
+import json
 from pathlib import Path
 
 from fastapi import Request
@@ -15,6 +16,7 @@ templates.env.filters.update(
     bgdate=fmt_date,
     price=fmt_price,
     phone=phone_for_speech,
+    pretty=lambda text: json.dumps(json.loads(text), ensure_ascii=False, indent=2) if text and text != "null" else "—",
     local=lambda dt, tz="Europe/Sofia": utc_to_local(dt, tz).strftime("%d.%m.%Y %H:%M") if dt else "",
 )
 templates.env.globals["WEEKDAYS"] = WEEKDAYS

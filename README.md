@@ -3,7 +3,9 @@
 AI гласов агент (ElevenLabs) вдига телефона на малка фирма, говори на български и записва часове.
 Това репо е бекендът: панел за собственика, база и webhook инструментите, които агентът вика.
 
-**Етап 1 (готов):** панел + база + 4 инструмента, тествани локално.
+- **Етап 1 (готов):** панел + база + 4 инструмента, тествани локално.
+- **Етап 2 (готов):** Cloudflare Tunnel, автоматично изпращане на промпта и инструментите към ElevenLabs,
+  лог на извикванията, тест с глас. **Ръководство стъпка по стъпка: [docs/ETAP2_ELEVENLABS.md](docs/ETAP2_ELEVENLABS.md)**
 
 ## Пускане
 
@@ -37,7 +39,8 @@ python -m pytest                       # автоматичните тестов
 | Услуги | име, продължителност, цена, активна/неактивна |
 | Въпроси | често задавани въпроси и отговори |
 | Фирма | данни, правила за записване, работно време, обедна почивка, почивни дни |
-| Агент | генериран system prompt и first message за копиране + адресите на инструментите |
+| Агент | връзка с ElevenLabs (Agent ID, публичен адрес, „Изпрати към ElevenLabs“), промпт, first message, данни за ръчна настройка |
+| Лог | всяко извикване на инструмент: заявка, отговор, време – за отстраняване на проблеми |
 
 ### Общи настройки (за всякакъв бизнес)
 - **Часове през (мин.)** – през колко минути се предлагат начални часове (напр. 30 за салон, 60 за сервиз).
@@ -54,7 +57,7 @@ python -m pytest                       # автоматичните тестов
 |---|---|---|
 | `check_availability` | `service`, `date` | `available_times`; ако няма – `reason` и `next_available_date` |
 | `book_appointment` | `name`, `phone`, `service`, `date`, `time` | `appointment_id` или `error: not_available` + `alternatives` |
-| `cancel_appointment` | `phone`, `date`, `time` (по желание) | отменен запис; `error: multiple` → поискай час |
+| `cancel_appointment` | `phone`, `date`, `time` (по желание), `caller_id` (по желание) | отменен запис; `error: multiple` → поискай час; `caller_mismatch`, ако номерът на обаждащия се е различен |
 | `take_message` | `name`, `phone`, `message` | `message_id` |
 
 Всеки отговор има `ok` и `message` – кратко изречение на български, което агентът може да каже директно.
@@ -74,6 +77,16 @@ curl -X POST http://localhost:8000/api/b/demo/tools/check_availability \
   -d '{"service": "мъжко подстригване", "date": "утре"}'
 ```
 
+## Връзка с ElevenLabs
+
+```bash
+python scripts/tunnel.py        # публичен адрес (Cloudflare) – записва се сам в панела
+```
+После панел → „Агент“ → „Изпрати към ElevenLabs“. Нужни са `ELEVENLABS_API_KEY` в `.env` и Agent ID в панела.
+Синхронизацията създава тайна за `X-Tool-Secret`, 4 webhook инструмента и записва промпта, първото съобщение
+и часовата зона в агента. С отметката „автоматично“ промпта се изпраща сам след всяка промяна в панела.
+Подробно: [docs/ETAP2_ELEVENLABS.md](docs/ETAP2_ELEVENLABS.md).
+
 ## Структура
 
 ```
@@ -87,12 +100,16 @@ app/
     availability.py  свободни часове, търсене на услуга
     booking.py       записване, отмяна, съобщения
     prompt.py        генериране на промпта
+    agent_tools.py   описанието на 4-те инструмента (за API-то и за ръчна настройка)
+    elevenlabs.py    синхронизация с ElevenLabs API
     textutil.py      дати/часове/телефони на български
     seed.py          нова фирма + демо данни
   prompts/system_prompt_bg.j2   шаблонът на промпта
   templates/, static/           панелът
 tests/               pytest
-scripts/sample_requests.sh
+scripts/sample_requests.sh   примерни заявки
+scripts/tunnel.py            Cloudflare Tunnel + запис на адреса
+docs/                        ръководства по етапи
 ```
 
 ## Ограничения (засега)

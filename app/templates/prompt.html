@@ -1,33 +1,78 @@
 {% extends "base.html" %}
 {% block title %}Агент{% endblock %}
 {% block content %}
-<h1>Настройки за агента в ElevenLabs</h1>
-<p class="muted">Текстовете се генерират от данните за фирмата. След промяна в услуги, работно време или въпроси – копирай ги наново в ElevenLabs.</p>
+<h1>Гласов агент (ElevenLabs)</h1>
+
+{% if url_changed %}
+  <div class="flash error">Публичният адрес е сменен, след като инструментите са създадени. Натисни „Изпрати към ElevenLabs“, за да ги обновиш.</div>
+{% elif prompt_outdated %}
+  <div class="flash error">Има промени във фирмата/услугите/въпросите, които още не са изпратени към агента.</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" action="/panel/agent">
+    <label>Публичен адрес на сървъра <span class="muted">(от Cloudflare Tunnel, напр. https://xxx.trycloudflare.com)</span>
+      <input name="public_base_url" value="{{ cfg.public_base_url }}" placeholder="https://..." inputmode="url"></label>
+    <label>Agent ID <span class="muted">(от ElevenLabs → агента → Settings/Widget, започва с agent_…)</span>
+      <input name="agent_id" value="{{ cfg.agent_id }}" placeholder="agent_..."></label>
+    <label class="check"><input type="checkbox" name="auto_sync" {{ 'checked' if cfg.auto_sync }}> <span>Изпращай промпта автоматично след всяка промяна в панела</span></label>
+    <label class="check"><input type="checkbox" name="cancel_only_own_number" {{ 'checked' if cfg.cancel_only_own_number }}> <span>Отмяна само от номера, на който е записан часът <span class="muted">(за реални обаждания)</span></span></label>
+    <div class="actions"><button class="secondary">Запази</button></div>
+  </form>
+  <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+  {% if has_api_key %}
+    <form method="post" action="/panel/agent/sync">
+      <button>Изпрати към ElevenLabs</button>
+    </form>
+    <p class="muted">Създава/обновява тайния ключ, 4-те инструмента, промпта и първото съобщение на агента. Безопасно е да се натиска многократно.</p>
+  {% else %}
+    <p class="muted">За автоматично изпращане добави <code>ELEVENLABS_API_KEY</code> в <code>.env</code> и рестартирай сървъра. Без ключ – настрой агента ръчно (по-долу).</p>
+  {% endif %}
+  {% if cfg.last_sync_at %}
+    <div class="flash {{ '' if cfg.last_sync_ok else 'error' }}" style="margin-top:10px">
+      {{ cfg.last_sync_at|local(b.timezone) }} – {{ cfg.last_sync_message }}
+    </div>
+  {% endif %}
+  <p class="muted">Проверка дали адресът работи: <a href="{{ tools_url.rsplit('/api/', 1)[0] }}/health" target="_blank">{{ tools_url.rsplit('/api/', 1)[0] }}/health</a> трябва да покаже <code>{"ok":true}</code>.
+    · <a href="/panel/tool-log">Лог на извикванията →</a></p>
+</div>
 
 <h2>First message (първо изречение)</h2>
 <div class="card">
   <pre class="prompt" id="first">{{ first_message }}</pre>
-  <button class="small" onclick="copyText('first', this)">Копирай</button>
+  <button class="small secondary" onclick="copyText('first', this)">Копирай</button>
   <p class="muted">Казва се дословно в началото на всеки разговор – така агентът винаги съобщава, че е AI асистент.</p>
 </div>
 
 <h2>System prompt</h2>
 <div class="card">
   <pre class="prompt" id="system">{{ system_prompt }}</pre>
-  <button class="small" onclick="copyText('system', this)">Копирай</button>
+  <button class="small secondary" onclick="copyText('system', this)">Копирай</button>
 </div>
 
-<h2>Инструменти (webhooks)</h2>
-<div class="card">
-  <p>Всички са <b>POST</b> с JSON тяло и заглавка <code>X-Tool-Secret</code> (стойността на TOOL_SECRET от .env).</p>
-  <ul>
-    <li><code>{{ tools_url }}/check_availability</code> – service, date</li>
-    <li><code>{{ tools_url }}/book_appointment</code> – name, phone, service, date, time</li>
-    <li><code>{{ tools_url }}/cancel_appointment</code> – phone, date, time (по желание)</li>
-    <li><code>{{ tools_url }}/take_message</code> – name, phone, message</li>
-  </ul>
-  <p class="muted">Адресът идва от PUBLIC_BASE_URL в .env – смени го с адреса от Cloudflare Tunnel.</p>
-</div>
+<h2>Ръчна настройка на инструментите</h2>
+<details class="card">
+  <summary>Покажи данните за 4-те инструмента</summary>
+  <p>Нужно само ако <b>не</b> ползваш бутона „Изпрати към ElevenLabs“. Създай всеки инструмент в ElevenLabs като
+    <b>Webhook</b>, метод <b>POST</b>, с заглавка <code>X-Tool-Secret</code>, която сочи към тайна (Secret) със стойността на
+    <code>TOOL_SECRET</code> от <code>.env</code>. Всички параметри са в <b>Body</b>, тип <b>String</b>.</p>
+  {% for t in specs %}
+    <div class="card" style="background:var(--bg)">
+      <div><b>Name:</b> <code>{{ t.name }}</code></div>
+      <div style="margin-top:6px"><b>Description:</b> <span id="d-{{ t.name }}">{{ t.description }}</span>
+        <button class="small secondary" onclick="copyText('d-{{ t.name }}', this)">Копирай</button></div>
+      <div style="margin-top:6px"><b>URL:</b> <code id="u-{{ t.name }}">{{ tools_url }}/{{ t.name }}</code>
+        <button class="small secondary" onclick="copyText('u-{{ t.name }}', this)">Копирай</button></div>
+      <div style="margin-top:6px"><b>Body параметри:</b></div>
+      <ul>
+        {% for p in t.params %}
+          <li><code>{{ p.name }}</code> – {{ 'задължителен' if p.required else 'по желание' }}.
+            {% if p.dynamic_variable %}Value type: <b>Dynamic variable</b> → <code>{{ p.dynamic_variable }}</code>{% else %}{{ p.description }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endfor %}
+</details>
 
 <script>
 function copyText(id, btn) {

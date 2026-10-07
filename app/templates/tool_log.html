@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Лог{% endblock %}
+{% block content %}
+<h1>Лог на инструментите</h1>
+<p class="muted">Последните 100 извиквания от агента. Ако агентът „не може да запише“ – тук се вижда какво точно е изпратил и какво е получил.
+  <a href="/panel/tool-log">Опресни</a></p>
+{% for c in items %}
+  <details class="card">
+    <summary>
+      {{ '✅' if c.ok else '⚠️' }} <b>{{ c.tool }}</b>
+      <span class="muted">· {{ c.created_at|local(b.timezone) }} · {{ c.duration_ms }} ms</span>
+    </summary>
+    <div class="muted" style="margin-top:8px">Заявка:</div>
+    <pre class="prompt">{{ c.request_json|pretty }}</pre>
+    <div class="muted">Отговор:</div>
+    <pre class="prompt">{{ c.response_json|pretty }}</pre>
+  </details>
+{% else %}
+  <p class="muted">Още няма извиквания.</p>
+{% endfor %}
+{% endblock %}

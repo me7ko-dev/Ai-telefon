@@ -126,3 +126,41 @@ class Message(Base):
     text: Mapped[str] = mapped_column(Text)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AgentConfig(Base):
+    """Връзката на фирмата с нейния ElevenLabs агент (по един ред на фирма)."""
+
+    __tablename__ = "agent_configs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id", ondelete="CASCADE"), unique=True)
+    agent_id: Mapped[str] = mapped_column(String(100), default="")
+    public_base_url: Mapped[str] = mapped_column(String(300), default="")  # празно = PUBLIC_BASE_URL от .env
+    auto_sync: Mapped[bool] = mapped_column(Boolean, default=True)  # изпращай промпта след всяка промяна
+    cancel_only_own_number: Mapped[bool] = mapped_column(Boolean, default=False)  # при реални обаждания
+
+    # Попълват се от синхронизацията
+    secret_id: Mapped[str] = mapped_column(String(100), default="")
+    secret_fingerprint: Mapped[str] = mapped_column(String(32), default="")
+    tool_ids: Mapped[str] = mapped_column(Text, default="{}")  # JSON {име на инструмент: id в ElevenLabs}
+    tools_url: Mapped[str] = mapped_column(String(300), default="")  # адресът, с който са създадени инструментите
+    pushed_prompt_hash: Mapped[str] = mapped_column(String(64), default="")
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    last_sync_message: Mapped[str] = mapped_column(Text, default="")
+
+
+class ToolCall(Base):
+    """Лог на всяко извикване на инструмент – за отстраняване на проблеми при тест с глас."""
+
+    __tablename__ = "tool_calls"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+    tool: Mapped[str] = mapped_column(String(50))
+    ok: Mapped[bool] = mapped_column(Boolean)
+    request_json: Mapped[str] = mapped_column(Text)
+    response_json: Mapped[str] = mapped_column(Text)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)

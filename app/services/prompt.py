@@ -54,4 +54,6 @@ def build_system_prompt(b: Business, today=None) -> str:
 def build_first_message(b: Business) -> str:
     """Казва се дословно в началото на всеки разговор – така агентът винаги съобщава, че е AI."""
     name = f", казвам се {b.assistant_name}" if b.assistant_name else ""
-    return f"Здравейте! Свързахте се с {b.name}. Аз съм AI асистент{name}. С какво мога да Ви помогна?"
+    first_letter = b.name.lstrip("„\"'« ")[:1].lower()
+    preposition = "със" if first_letter in ("с", "з") else "с"
+    return f"Здравейте! Свързахте се {preposition} {b.name}. Аз съм AI асистент{name}. С какво мога да Ви помогна?"

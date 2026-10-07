@@ -2,16 +2,18 @@
 
 from datetime import UTC, date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
 from app.deps import panel_business, require_login
-from app.models import Appointment, Business, DayOff, Faq, Message, Service
+from app.models import Appointment, Business, DayOff, Faq, Message, Service, ToolCall
 from app.services import booking
-from app.services.prompt import build_first_message, build_system_prompt
+from app.services import elevenlabs as el
+from app.services.agent_tools import tool_specs
+from app.services.elevenlabs import auto_push
 from app.services.textutil import WEEKDAYS, InputError, now_local
 from app.web import flash, redirect, render
 
@@ -81,7 +83,7 @@ def business_form(request: Request, b: Business = Depends(panel_business)):
 
 
 @router.post("/business")
-async def business_save(request: Request, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+async def business_save(request: Request, bg: BackgroundTasks, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
     form = await request.form()
     name = (form.get("name") or "").strip()
     if not name:
@@ -117,12 +119,13 @@ async def business_save(request: Request, b: Business = Depends(panel_business),
     for e in errors:
         flash(request, e, "error")
     flash(request, "Запазено.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/business")
 
 
 @router.post("/days-off")
 def day_off_add(
-    request: Request,
+    request: Request, bg: BackgroundTasks,
     day: date = Form(...),
     note: str = Form(""),
     b: Business = Depends(panel_business),
@@ -134,15 +137,17 @@ def day_off_add(
         db.add(DayOff(business_id=b.id, date=day, note=note.strip()))
         db.commit()
         flash(request, "Почивният ден е добавен.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/business#days-off")
 
 
 @router.post("/days-off/{item_id}/delete")
-def day_off_delete(request: Request, item_id: int, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+def day_off_delete(request: Request, bg: BackgroundTasks, item_id: int, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
     if obj := _get_owned(db, DayOff, item_id, b):
         db.delete(obj)
         db.commit()
         flash(request, "Изтрито.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/business#days-off")
 
 
@@ -155,7 +160,7 @@ def services_list(request: Request, b: Business = Depends(panel_business)):
 
 @router.post("/services")
 def service_add(
-    request: Request,
+    request: Request, bg: BackgroundTasks,
     name: str = Form(""),
     duration_min: str = Form("30"),
     price: str = Form(""),
@@ -179,12 +184,13 @@ def service_add(
     )
     db.commit()
     flash(request, "Услугата е добавена.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/services")
 
 
 @router.post("/services/{item_id}")
 def service_update(
-    request: Request,
+    request: Request, bg: BackgroundTasks,
     item_id: int,
     name: str = Form(""),
     duration_min: str = Form("30"),
@@ -203,15 +209,17 @@ def service_update(
         s.is_active = is_active == "on"
         db.commit()
         flash(request, f"„{s.name}“ е запазена.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/services")
 
 
 @router.post("/services/{item_id}/delete")
-def service_delete(request: Request, item_id: int, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+def service_delete(request: Request, bg: BackgroundTasks, item_id: int, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
     if s := _get_owned(db, Service, item_id, b):
         db.delete(s)
         db.commit()
         flash(request, "Услугата е изтрита. Старите записи остават.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/services")
 
 
@@ -224,7 +232,7 @@ def faqs_list(request: Request, b: Business = Depends(panel_business)):
 
 @router.post("/faqs")
 def faq_add(
-    request: Request,
+    request: Request, bg: BackgroundTasks,
     question: str = Form(""),
     answer: str = Form(""),
     b: Business = Depends(panel_business),
@@ -237,12 +245,13 @@ def faq_add(
     db.add(Faq(business_id=b.id, question=question.strip(), answer=answer.strip(), position=pos))
     db.commit()
     flash(request, "Въпросът е добавен.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/faqs")
 
 
 @router.post("/faqs/{item_id}")
 def faq_update(
-    request: Request,
+    request: Request, bg: BackgroundTasks,
     item_id: int,
     question: str = Form(""),
     answer: str = Form(""),
@@ -254,15 +263,17 @@ def faq_update(
         f.question, f.answer = question.strip(), answer.strip()
         db.commit()
         flash(request, "Запазено.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/faqs")
 
 
 @router.post("/faqs/{item_id}/delete")
-def faq_delete(request: Request, item_id: int, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+def faq_delete(request: Request, bg: BackgroundTasks, item_id: int, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
     if f := _get_owned(db, Faq, item_id, b):
         db.delete(f)
         db.commit()
         flash(request, "Изтрито.")
+    bg.add_task(auto_push, b.id)
     return redirect("/panel/faqs")
 
 
@@ -348,18 +359,66 @@ def message_delete(request: Request, item_id: int, b: Business = Depends(panel_b
     return redirect("/panel/messages")
 
 
-# ---------- промпт за агента ----------
+# ---------- агент (ElevenLabs) ----------
 
 @router.get("/prompt")
-def prompt_view(request: Request, b: Business = Depends(panel_business)):
-    today = now_local(b.timezone).date()
-    base = get_settings().public_base_url.rstrip("/")
-    tools_url = f"{base}/api/b/{b.slug}/tools"
+def agent_page(request: Request, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+    cfg = el.get_config(db, b)
+    system_prompt, first_message = el.prompt_texts(b)
+    url = el.tools_url(cfg, b)
+    synced = cfg.tool_ids not in ("", "{}")
     return render(
         request,
         "prompt.html",
         b=b,
-        system_prompt=build_system_prompt(b, today),
-        first_message=build_first_message(b),
-        tools_url=tools_url,
+        cfg=cfg,
+        system_prompt=system_prompt,
+        first_message=first_message,
+        tools_url=url,
+        specs=tool_specs(cfg.cancel_only_own_number),
+        has_api_key=bool(get_settings().elevenlabs_api_key),
+        synced=synced,
+        prompt_outdated=synced and cfg.pushed_prompt_hash != el.prompt_hash(b),
+        url_changed=synced and cfg.tools_url != url,
     )
+
+
+@router.post("/agent")
+def agent_save(
+    request: Request,
+    agent_id: str = Form(""),
+    public_base_url: str = Form(""),
+    auto_sync: str | None = Form(None),
+    cancel_only_own_number: str | None = Form(None),
+    b: Business = Depends(panel_business),
+    db: Session = Depends(get_db),
+):
+    cfg = el.get_config(db, b)
+    cfg.agent_id = agent_id.strip()
+    cfg.public_base_url = public_base_url.strip().rstrip("/")
+    cfg.auto_sync = auto_sync == "on"
+    cfg.cancel_only_own_number = cancel_only_own_number == "on"
+    db.commit()
+    flash(request, "Настройките на агента са запазени. Натисни „Изпрати към ElevenLabs“, за да се приложат.")
+    return redirect("/panel/prompt")
+
+
+@router.post("/agent/sync")
+def agent_sync(request: Request, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+    client = el.make_client()
+    if client is None:
+        flash(request, "Липсва ELEVENLABS_API_KEY в .env – добави го и рестартирай сървъра, или настрой агента ръчно.", "error")
+        return redirect("/panel/prompt")
+    try:
+        flash(request, el.sync_all(db, b, client))
+    except el.ElevenLabsError as e:
+        flash(request, str(e), "error")
+    return redirect("/panel/prompt")
+
+
+@router.get("/tool-log")
+def tool_log(request: Request, b: Business = Depends(panel_business), db: Session = Depends(get_db)):
+    items = db.scalars(
+        select(ToolCall).where(ToolCall.business_id == b.id).order_by(ToolCall.id.desc()).limit(100)
+    ).all()
+    return render(request, "tool_log.html", b=b, items=items)

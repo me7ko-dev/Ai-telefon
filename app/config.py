@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     panel_business_slug: str = "demo"
     seed_demo: bool = True
     public_base_url: str = "http://localhost:8000"
+    elevenlabs_api_key: str = ""
+    elevenlabs_api_url: str = "https://api.elevenlabs.io"
 
     def warn_if_insecure(self) -> None:
         for name in ("admin_password", "secret_key", "tool_secret"):

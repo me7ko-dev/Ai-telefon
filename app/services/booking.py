@@ -156,8 +156,18 @@ def _booking_result(appt: Appointment, today, already: bool = False) -> dict:
     }
 
 
-def cancel_appointment(db: Session, business: Business, phone: str, date_q: str, time_q: str | None = None) -> dict:
+def cancel_appointment(
+    db: Session, business: Business, phone: str, date_q: str, time_q: str | None = None, caller_id: str | None = None
+) -> dict:
     phone_n = normalize_phone(phone)
+    caller = _caller_phone(caller_id)
+    if caller and caller != phone_n:
+        return {
+            "ok": False,
+            "error": "caller_mismatch",
+            "message": "От съображения за сигурност по телефона може да се отменя само час, записан на номера, "
+            "от който се обаждате. За друг номер – запиши съобщение за собственика.",
+        }
     now = now_local(business.timezone)
     today = now.date()
     day = parse_date(date_q, today)
@@ -202,6 +212,16 @@ def cancel_appointment(db: Session, business: Business, phone: str, date_q: str,
         "message": f"Отменено: {appt.service_name}, {fmt_date(appt.date, today)} от {fmt_time(appt.start_time)}, "
         f"на името на {appt.customer_name}.",
     }
+
+
+def _caller_phone(caller_id: str | None) -> str | None:
+    """Номерът на обаждащия се от ElevenLabs (system__caller_id). Празно/скрито/невалидно = не проверяваме."""
+    if not caller_id or "{" in caller_id:
+        return None
+    try:
+        return normalize_phone(caller_id)
+    except InputError:
+        return None
 
 
 def take_message(db: Session, business: Business, name: str, phone: str, text: str) -> dict:
