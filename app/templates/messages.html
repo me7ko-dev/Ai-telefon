@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Съобщения{% endblock %}
+{% block content %}
+<h1>Съобщения от клиенти</h1>
+{% for m in items %}
+  <div class="card {{ 'unread' if not m.is_read }}">
+    <div class="list-item">
+      <div><b>{{ m.name }}</b> · <a href="tel:{{ m.phone }}">{{ m.phone|phone }}</a></div>
+      <span class="muted">{{ m.created_at|local(b.timezone) }}</span>
+    </div>
+    <p style="white-space:pre-wrap">{{ m.text }}</p>
+    <div class="actions">
+      <form method="post" action="/panel/messages/{{ m.id }}/read">
+        <button class="secondary small">{{ 'Отбележи като ново' if m.is_read else 'Прочетено' }}</button>
+      </form>
+      <form method="post" action="/panel/messages/{{ m.id }}/delete" onsubmit="return confirm('Да изтрия ли съобщението?')">
+        <button class="danger small">Изтрий</button>
+      </form>
+    </div>
+  </div>
+{% else %}
+  <p class="muted">Няма съобщения.</p>
+{% endfor %}
+{% endblock %}

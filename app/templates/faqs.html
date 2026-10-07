@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Въпроси{% endblock %}
+{% block content %}
+<h1>Често задавани въпроси</h1>
+<p class="muted">Агентът отговаря само с това, което е написано тук и в данните за фирмата. За всичко друго записва съобщение.</p>
+{% for f in b.faqs %}
+  <form method="post" action="/panel/faqs/{{ f.id }}" class="card">
+    <label>Въпрос<input name="question" value="{{ f.question }}" required></label>
+    <label>Отговор<textarea name="answer" required>{{ f.answer }}</textarea></label>
+    <div class="actions">
+      <button class="small">Запази</button>
+      <button class="danger small" formaction="/panel/faqs/{{ f.id }}/delete" onclick="return confirm('Да изтрия ли въпроса?')">Изтрий</button>
+    </div>
+  </form>
+{% else %}
+  <p class="muted">Още няма въпроси.</p>
+{% endfor %}
+
+<h2>Нов въпрос</h2>
+<form method="post" action="/panel/faqs" class="card">
+  <label>Въпрос<input name="question" required placeholder="напр. Има ли паркинг?"></label>
+  <label>Отговор<textarea name="answer" required></textarea></label>
+  <button>Добави</button>
+</form>
+{% endblock %}

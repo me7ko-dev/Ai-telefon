@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Панел{% endblock %} · AI Рецепционист</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% set path = request.url.path %}
+<header>
+  <div class="top">
+    <strong>{{ b.name if b else "AI Рецепционист" }}</strong>
+    <form method="post" action="/logout"><button class="secondary small">Изход</button></form>
+  </div>
+  <nav>
+    {% for url, label in [("/panel", "Табло"), ("/panel/appointments", "Часове"), ("/panel/messages", "Съобщения"),
+                          ("/panel/services", "Услуги"), ("/panel/faqs", "Въпроси"), ("/panel/business", "Фирма"),
+                          ("/panel/prompt", "Агент")] %}
+      <a href="{{ url }}" class="{{ 'active' if path == url else '' }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+</header>
+<main>
+  {% for f in request.session.pop('flash', []) %}
+    <div class="flash {{ f.kind }}">{{ f.text }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход · AI Рецепционист</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="login">
+  <h1>AI Рецепционист</h1>
+  <form method="post" action="/login" class="card">
+    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    <label>Парола
+      <input type="password" name="password" autofocus required autocomplete="current-password">
+    </label>
+    <button>Вход</button>
+  </form>
+</main>
+</body>
+</html>

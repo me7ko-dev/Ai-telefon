@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Фирма{% endblock %}
+{% block content %}
+<h1>Фирма и работно време</h1>
+<form method="post" action="/panel/business">
+  <div class="card">
+    <label>Име на фирмата<input name="name" value="{{ b.name }}" required></label>
+    <label>Вид бизнес <span class="muted">(напр. фризьорски салон, автосервиз)</span>
+      <input name="business_type" value="{{ b.business_type }}"></label>
+    <label>Адрес<input name="address" value="{{ b.address }}"></label>
+    <label>Кратко описание<textarea name="description">{{ b.description }}</textarea></label>
+    <label>Допълнителна информация за агента <span class="muted">(паркинг, плащане, как се стига…)</span>
+      <textarea name="extra_info">{{ b.extra_info }}</textarea></label>
+    <div class="row">
+      <label>Име на асистента <span class="muted">(по желание)</span><input name="assistant_name" value="{{ b.assistant_name }}"></label>
+      <label>Валута <span class="muted">(както се казва)</span><input name="currency" value="{{ b.currency }}"></label>
+    </div>
+  </div>
+
+  <h2>Правила за записване</h2>
+  <div class="card">
+    <div class="row">
+      <label>Часове през (минути)<input type="number" name="slot_step_min" min="5" max="240" value="{{ b.slot_step_min }}"></label>
+      <label>Клиенти едновременно<input type="number" name="capacity" min="1" max="50" value="{{ b.capacity }}"></label>
+    </div>
+    <div class="row">
+      <label>Най-рано след (минути)<input type="number" name="min_notice_min" min="0" value="{{ b.min_notice_min }}"></label>
+      <label>Най-много дни напред<input type="number" name="booking_horizon_days" min="1" max="365" value="{{ b.booking_horizon_days }}"></label>
+    </div>
+    <p class="muted">„Клиенти едновременно“ = колко работни места/служители има. При 2 по едно и също време може да има 2 записа.</p>
+  </div>
+
+  <h2>Работно време</h2>
+  <div class="card hours">
+    {% for w in b.working_hours %}
+      <div class="day">
+        <label class="check"><input type="checkbox" name="open_{{ w.weekday }}" {{ 'checked' if w.is_open }}> {{ WEEKDAYS[w.weekday]|capitalize }}</label>
+        <input type="time" name="from_{{ w.weekday }}" value="{{ w.open_time|hm_input }}" aria-label="от">
+        <input type="time" name="to_{{ w.weekday }}" value="{{ w.close_time|hm_input }}" aria-label="до">
+        <div class="brk">
+          <input type="time" name="bstart_{{ w.weekday }}" value="{{ w.break_start|hm_input }}" aria-label="почивка от" title="почивка от">
+          <input type="time" name="bend_{{ w.weekday }}" value="{{ w.break_end|hm_input }}" aria-label="почивка до" title="почивка до">
+        </div>
+      </div>
+    {% endfor %}
+    <p class="muted">Отметката = работен ден. Втория ред (по желание) е обедна почивка.</p>
+  </div>
+  <button>Запази</button>
+</form>
+
+<h2 id="days-off">Почивни дни (празници, отпуск)</h2>
+<form method="post" action="/panel/days-off" class="card">
+  <div class="row">
+    <label>Дата<input type="date" name="day" min="{{ today.isoformat() }}" required></label>
+    <label>Бележка<input name="note" placeholder="напр. Коледа"></label>
+  </div>
+  <button class="secondary">Добави</button>
+</form>
+{% for d in days_off %}
+  <div class="card list-item">
+    <div><b>{{ d.date|bgdate }}</b>{% if d.note %} <span class="muted">· {{ d.note }}</span>{% endif %}</div>
+    <form method="post" action="/panel/days-off/{{ d.id }}/delete"><button class="danger small">Изтрий</button></form>
+  </div>
+{% else %}
+  <p class="muted">Няма добавени почивни дни.</p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Часове{% endblock %}
+{% block content %}
+<h1>Записани часове</h1>
+<div class="tabs">
+  <a href="?show=upcoming" class="{{ 'active' if show == 'upcoming' }}">Предстоящи</a>
+  <a href="?show=past" class="{{ 'active' if show == 'past' }}">Минали</a>
+  <a href="?show=cancelled" class="{{ 'active' if show == 'cancelled' }}">Отменени</a>
+</div>
+
+<details class="card">
+  <summary>+ Запиши час ръчно</summary>
+  <form method="post" action="/panel/appointments" style="margin-top:12px">
+    <label>Услуга
+      <select name="service" required>
+        {% for s in b.services if s.is_active %}<option>{{ s.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="row">
+      <label>Дата<input type="date" name="day" min="{{ today.isoformat() }}" value="{{ tomorrow.isoformat() }}" required></label>
+      <label>Час<input type="time" name="start" step="300" required></label>
+    </div>
+    <div class="row">
+      <label>Име<input name="name" required></label>
+      <label>Телефон<input name="phone" type="tel" required></label>
+    </div>
+    <label>Бележка<input name="note"></label>
+    <button>Запиши</button>
+    <p class="muted">Важат същите правила като при агента – часът трябва да е свободен и в работното време.</p>
+  </form>
+</details>
+
+{% for a in items %}
+  {% if loop.changed(a.date) %}<div class="day-head">{{ a.date|bgdate(today) }}</div>{% endif %}
+  <div class="card list-item">
+    <div class="time">{{ a.start_time|hm }}</div>
+    <div style="flex:1">
+      <div><b>{{ a.customer_name }}</b> · {{ a.service_name }}</div>
+      <div class="muted">
+        до {{ a.end_time|hm }} · <a href="tel:{{ a.phone }}">{{ a.phone|phone }}</a>
+        · {{ 'от агента' if a.source == 'agent' else 'ръчно' }}
+        {% if a.note %}<br>{{ a.note }}{% endif %}
+        {% if a.status == 'cancelled' %}<br>отменен {{ a.cancelled_at|local(b.timezone) }}{% endif %}
+      </div>
+    </div>
+    {% if a.status == 'booked' and show == 'upcoming' %}
+      <form method="post" action="/panel/appointments/{{ a.id }}/cancel" onsubmit="return confirm('Да отменя ли часа?')">
+        <button class="danger small">Отмени</button>
+      </form>
+    {% endif %}
+  </div>
+{% else %}
+  <p class="muted">Няма записи.</p>
+{% endfor %}
+{% endblock %}

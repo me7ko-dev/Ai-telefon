@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Табло{% endblock %}
+{% block content %}
+<h1>Добър ден!</h1>
+<div class="stats">
+  <a class="stat" href="/panel/appointments"><b>{{ todays|length }}</b><span class="muted">днес</span></a>
+  <a class="stat" href="/panel/appointments"><b>{{ upcoming }}</b><span class="muted">предстоящи</span></a>
+  <a class="stat" href="/panel/messages"><b>{{ unread }}</b><span class="muted">нови съобщения</span></a>
+</div>
+
+<h2>Днес, {{ today|bgdate }}</h2>
+{% for a in todays %}
+  <div class="card list-item">
+    <div class="time">{{ a.start_time|hm }}</div>
+    <div style="flex:1">
+      <div><b>{{ a.customer_name }}</b> · {{ a.service_name }}</div>
+      <div class="muted">до {{ a.end_time|hm }} · <a href="tel:{{ a.phone }}">{{ a.phone|phone }}</a></div>
+    </div>
+  </div>
+{% else %}
+  <p class="muted">Няма записани часове за днес.</p>
+{% endfor %}
+
+{% if not b.services %}
+  <div class="card">Още няма въведени услуги. <a href="/panel/services">Добави услуги</a>, за да може агентът да записва часове.</div>
+{% endif %}
+{% endblock %}

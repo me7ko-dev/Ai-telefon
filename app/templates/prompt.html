@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Агент{% endblock %}
+{% block content %}
+<h1>Настройки за агента в ElevenLabs</h1>
+<p class="muted">Текстовете се генерират от данните за фирмата. След промяна в услуги, работно време или въпроси – копирай ги наново в ElevenLabs.</p>
+
+<h2>First message (първо изречение)</h2>
+<div class="card">
+  <pre class="prompt" id="first">{{ first_message }}</pre>
+  <button class="small" onclick="copyText('first', this)">Копирай</button>
+  <p class="muted">Казва се дословно в началото на всеки разговор – така агентът винаги съобщава, че е AI асистент.</p>
+</div>
+
+<h2>System prompt</h2>
+<div class="card">
+  <pre class="prompt" id="system">{{ system_prompt }}</pre>
+  <button class="small" onclick="copyText('system', this)">Копирай</button>
+</div>
+
+<h2>Инструменти (webhooks)</h2>
+<div class="card">
+  <p>Всички са <b>POST</b> с JSON тяло и заглавка <code>X-Tool-Secret</code> (стойността на TOOL_SECRET от .env).</p>
+  <ul>
+    <li><code>{{ tools_url }}/check_availability</code> – service, date</li>
+    <li><code>{{ tools_url }}/book_appointment</code> – name, phone, service, date, time</li>
+    <li><code>{{ tools_url }}/cancel_appointment</code> – phone, date, time (по желание)</li>
+    <li><code>{{ tools_url }}/take_message</code> – name, phone, message</li>
+  </ul>
+  <p class="muted">Адресът идва от PUBLIC_BASE_URL в .env – смени го с адреса от Cloudflare Tunnel.</p>
+</div>
+
+<script>
+function copyText(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).innerText).then(() => {
+    const old = btn.textContent; btn.textContent = "Копирано ✓"; setTimeout(() => btn.textContent = old, 1500);
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Услуги{% endblock %}
+{% block content %}
+<h1>Услуги</h1>
+{% for s in b.services %}
+  <form method="post" action="/panel/services/{{ s.id }}" class="card">
+    <label>Име<input name="name" value="{{ s.name }}" required></label>
+    <div class="row">
+      <label>Продължителност (мин.)<input type="number" name="duration_min" min="5" max="600" value="{{ s.duration_min }}"></label>
+      <label>Цена ({{ b.currency }})<input name="price" inputmode="decimal" value="{{ '%g'|format(s.price) if s.price is not none else '' }}" placeholder="празно = по договаряне"></label>
+    </div>
+    <label>Бележка за агента <span class="muted">(по желание)</span><input name="description" value="{{ s.description }}"></label>
+    <label class="check"><input type="checkbox" name="is_active" {{ 'checked' if s.is_active }}> Активна (агентът я предлага)</label>
+    <div class="actions">
+      <button class="small">Запази</button>
+      <button class="danger small" formaction="/panel/services/{{ s.id }}/delete" onclick="return confirm('Да изтрия ли услугата?')">Изтрий</button>
+    </div>
+  </form>
+{% else %}
+  <p class="muted">Още няма услуги.</p>
+{% endfor %}
+
+<h2>Нова услуга</h2>
+<form method="post" action="/panel/services" class="card">
+  <label>Име<input name="name" required placeholder="напр. Мъжко подстригване"></label>
+  <div class="row">
+    <label>Продължителност (мин.)<input type="number" name="duration_min" min="5" max="600" value="30"></label>
+    <label>Цена ({{ b.currency }})<input name="price" inputmode="decimal" placeholder="празно = по договаряне"></label>
+  </div>
+  <label>Бележка за агента <span class="muted">(по желание)</span><input name="description"></label>
+  <button>Добави</button>
+</form>
+{% endblock %}
